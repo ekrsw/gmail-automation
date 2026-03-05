@@ -38,7 +38,7 @@ def compute_daily_pnl(input_path: Path, output_path: Path) -> int:
 
             date = record["report_date"].split(" ")[0]
             account_no = record["account_no"]
-            deals = record.get("deals", [])
+            deals = [d for d in record.get("deals", []) if d.get("type") != "balance"]
 
             commission = round(sum(d["commission"] + d["fee"] for d in deals), 2)
             swap = round(sum(d["swap"] for d in deals), 2)
