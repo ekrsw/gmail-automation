@@ -22,7 +22,9 @@ def compute_daily_pnl(input_path: Path, output_path: Path) -> int:
         出力したレコード数。
     """
     daily: dict[str, dict[str, dict[str, float]]] = defaultdict(dict)
+    seen_tickets: set[tuple[str, str]] = set()
 
+    records = []
     with input_path.open(encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -31,19 +33,40 @@ def compute_daily_pnl(input_path: Path, output_path: Path) -> int:
             record = json.loads(line)
             if record.get("currency") != "USD":
                 continue
-            account_summary = record.get("account_summary")
-            if account_summary is None:
+            if record.get("account_summary") is None:
                 logger.warning("account_summaryが存在しないレコードをスキップ: %s", record.get("account_no"))
                 continue
+            records.append(record)
 
-            date = record["report_date"].split(" ")[0]
-            account_no = record["account_no"]
-            deals = [d for d in record.get("deals", []) if d.get("type") != "balance"]
+    records.sort(key=lambda r: r["report_date"])
 
-            commission = round(sum(d["commission"] + d["fee"] for d in deals), 2)
-            swap = round(sum(d["swap"] for d in deals), 2)
-            profit = round(sum(d["profit"] for d in deals), 2)
+    for record in records:
+        date = record["report_date"].split(" ")[0]
+        account_no = record["account_no"]
+        account_summary = record["account_summary"]
 
+        deals = []
+        for d in record.get("deals", []):
+            if d.get("type") == "balance":
+                continue
+            key = (account_no, d["ticket"])
+            if key in seen_tickets:
+                continue
+            seen_tickets.add(key)
+            deals.append(d)
+
+        commission = round(sum(d["commission"] + d["fee"] for d in deals), 2)
+        swap = round(sum(d["swap"] for d in deals), 2)
+        profit = round(sum(d["profit"] for d in deals), 2)
+
+        if account_no in daily[date]:
+            existing = daily[date][account_no]
+            existing["commission"] = round(existing["commission"] + commission, 2)
+            existing["swap"] = round(existing["swap"] + swap, 2)
+            existing["profit"] = round(existing["profit"] + profit, 2)
+            existing["balance"] = account_summary["balance"]
+            existing["deposit_withdrawal"] = account_summary["deposit_withdrawal"]
+        else:
             daily[date][account_no] = {
                 "deposit_withdrawal": account_summary["deposit_withdrawal"],
                 "commission": commission,
