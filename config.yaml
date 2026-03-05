@@ -1,0 +1,17 @@
+gmail:
+  target_senders:
+  - support@icmarkets.com
+  unread_only: false
+pubsub:
+  project_id: gmail-automation-489304
+  topic_name: gmail-notifications
+  subscription_name: gmail-notifications-sub
+output:
+  directory: ./output
+  filename_template: '{date}_{sender}_{subject}'
+auth:
+  credentials_file: ./credentials/credentials.json
+  token_file: ./credentials/token.json
+logging:
+  level: INFO
+  file: null
