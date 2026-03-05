@@ -125,6 +125,15 @@ uv run python -m gmail_automation parse
 uv run python -m gmail_automation parse --input output/emails.jsonl --output output/parsed_confirmations.jsonl
 ```
 
+### 日別損益算出
+
+パース済みの Daily Confirmation データから、アカウント別・日別の USD 損益を算出します。
+
+```bash
+# デフォルト（output/parsed_confirmations.jsonl → output/daily_pnl.jsonl）
+uv run python -m gmail_automation daily-pnl --input-path output/parsed_confirmations.jsonl --output-path output/daily_pnl.jsonl
+```
+
 ### コマンド一覧
 
 | コマンド | 説明 |
@@ -132,6 +141,7 @@ uv run python -m gmail_automation parse --input output/emails.jsonl --output out
 | `auth` | OAuth2 認証を実行 |
 | `fetch` | 手動でメールを取得して PDF 化 |
 | `parse` | Daily Confirmation メールをパースして JSONL 出力 |
+| `daily-pnl` | 日別 USD 損益を算出して JSONL 出力 |
 | `watch` | Pub/Sub でリアルタイム監視 |
 | `config-init` | 設定ファイルのテンプレートを生成 |
 
@@ -171,6 +181,7 @@ gmail_automation/
 │   ├── gmail_client.py        # Gmail API クライアント
 │   ├── converter.py           # HTML/テキスト → PDF 変換
 │   ├── parser.py              # Daily Confirmation HTML パーサー
+│   ├── daily_pnl.py           # 日別 USD 損益算出
 │   ├── processor.py           # メール処理パイプライン
 │   └── pubsub_listener.py     # Pub/Sub リアルタイム監視
 ├── credentials/               # 認証情報（git 管理外）

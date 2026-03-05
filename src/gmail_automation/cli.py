@@ -141,6 +141,32 @@ def parse(
 
 
 @app.command()
+def daily_pnl(
+    input_path: Path = typer.Option(
+        Path("output/parsed_confirmations.jsonl"),
+        "--input-path",
+        "-i",
+        help="入力JSONLファイルのパス",
+    ),
+    output_path: Path = typer.Option(
+        Path("output/daily_pnl.jsonl"),
+        "--output-path",
+        "-o",
+        help="出力JSONLファイルのパス",
+    ),
+) -> None:
+    """日別USD損益を算出する。"""
+    _setup_logging("INFO")
+
+    from gmail_automation.daily_pnl import compute_daily_pnl
+
+    count = compute_daily_pnl(input_path, output_path)
+    typer.echo(f"日別損益算出完了: {count}件のレコードを出力しました")
+    if count > 0:
+        typer.echo(f"  出力先: {output_path}")
+
+
+@app.command()
 def config_init(
     output_path: Path = typer.Option(
         DEFAULT_CONFIG_PATH, "--output", "-o", help="出力先パス",
