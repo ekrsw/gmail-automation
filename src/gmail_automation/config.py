@@ -45,7 +45,7 @@ class OutputConfig(BaseModel):
 
     directory: Path = Field(
         default=Path("./output"),
-        description="PDF出力先ディレクトリ",
+        description="JSONL出力先ディレクトリ",
     )
     filename_template: str = Field(
         default="{date}_{sender}_{subject}",

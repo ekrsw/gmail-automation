@@ -1,13 +1,6 @@
 """テスト共通フィクスチャ"""
 
 import base64
-import sys
-from unittest.mock import MagicMock
-
-# WeasyPrintはシステムライブラリ（libgobject等）に依存するため、
-# テスト環境ではモックに差し替える
-_mock_weasyprint = MagicMock()
-sys.modules.setdefault("weasyprint", _mock_weasyprint)
 
 import pytest
 
@@ -55,6 +48,7 @@ def sample_message():
     return {
         "id": "msg_001",
         "threadId": "thread_001",
+        "labelIds": ["INBOX"],
         "payload": {
             "mimeType": "multipart/alternative",
             "headers": [

@@ -1,46 +1,15 @@
 """converter モジュールのテスト"""
 
+import json
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
 from gmail_automation.converter import (
-    text_to_html,
-    wrap_html_with_style,
     generate_filename,
-    convert_to_pdf,
+    build_mail_record,
+    append_to_jsonl,
 )
-
-
-class TestTextToHtml:
-    """text_to_html関数のテスト"""
-
-    def test_text_to_html(self):
-        """改行がbrタグに変換され、HTMLエスケープが適用される。"""
-        text = "行1\n行2\n<script>alert('xss')</script>"
-
-        result = text_to_html(text)
-
-        assert "<br>" in result
-        assert "&lt;script&gt;" in result
-        assert "<script>" not in result
-
-
-class TestWrapHtmlWithStyle:
-    """wrap_html_with_style関数のテスト"""
-
-    def test_wrap_html_with_style(self):
-        """CSSスタイルを含む完全なHTMLドキュメントが生成される。"""
-        content = "<p>テスト</p>"
-
-        result = wrap_html_with_style(content)
-
-        assert "<!DOCTYPE html>" in result
-        assert '<html lang="ja">' in result
-        assert "<style>" in result
-        assert "Noto Sans JP" in result
-        assert content in result
 
 
 class TestGenerateFilename:
@@ -87,23 +56,80 @@ class TestGenerateFilename:
         assert len(result) <= 100
 
 
-class TestConvertToPdf:
-    """convert_to_pdf関数のテスト"""
+class TestBuildMailRecord:
+    """build_mail_record関数のテスト"""
 
-    def test_convert_to_pdf(self, mocker, tmp_path):
-        """WeasyPrintのwrite_pdfが正しく呼ばれることを確認する。"""
-        mock_html_cls = mocker.patch("gmail_automation.converter.HTML")
-        mock_instance = MagicMock()
-        mock_html_cls.return_value = mock_instance
+    def test_build_mail_record(self):
+        """メッセージからJSONLレコードが正しく構築される。"""
+        message = {
+            "id": "msg_001",
+            "threadId": "thread_001",
+            "labelIds": ["INBOX", "UNREAD"],
+        }
 
-        output_path = tmp_path / "test.pdf"
-
-        result = convert_to_pdf(
-            html_content="<p>テスト</p>",
-            text_content=None,
-            output_path=output_path,
+        record = build_mail_record(
+            message=message,
+            sender="test@example.com",
+            subject="テスト件名",
+            date_str="2026-03-01",
+            html_body="<p>本文</p>",
+            text_body="本文",
         )
 
-        mock_html_cls.assert_called_once()
-        mock_instance.write_pdf.assert_called_once_with(output_path)
+        assert record["message_id"] == "msg_001"
+        assert record["thread_id"] == "thread_001"
+        assert record["sender"] == "test@example.com"
+        assert record["subject"] == "テスト件名"
+        assert record["date"] == "2026-03-01"
+        assert record["html_body"] == "<p>本文</p>"
+        assert record["text_body"] == "本文"
+        assert record["labels"] == ["INBOX", "UNREAD"]
+        assert "fetched_at" in record
+
+    def test_build_mail_record_none_body(self):
+        """本文がNoneの場合に空文字列が設定される。"""
+        message = {"id": "msg_002", "threadId": "thread_002"}
+
+        record = build_mail_record(
+            message=message,
+            sender="test@example.com",
+            subject="テスト",
+            date_str="2026-03-01",
+            html_body=None,
+            text_body=None,
+        )
+
+        assert record["html_body"] == ""
+        assert record["text_body"] == ""
+        assert record["labels"] == []
+
+
+class TestAppendToJsonl:
+    """append_to_jsonl関数のテスト"""
+
+    def test_append_to_jsonl(self, tmp_path):
+        """レコードがJSONLファイルに正しく追記される。"""
+        output_path = tmp_path / "output" / "emails.jsonl"
+        record = {"message_id": "msg_001", "subject": "テスト"}
+
+        result = append_to_jsonl(record, output_path)
+
         assert result == output_path
+        assert output_path.exists()
+
+        line = output_path.read_text(encoding="utf-8").strip()
+        parsed = json.loads(line)
+        assert parsed["message_id"] == "msg_001"
+        assert parsed["subject"] == "テスト"
+
+    def test_append_to_jsonl_multiple(self, tmp_path):
+        """複数レコードが1行1レコードで追記される。"""
+        output_path = tmp_path / "emails.jsonl"
+
+        append_to_jsonl({"message_id": "msg_001"}, output_path)
+        append_to_jsonl({"message_id": "msg_002"}, output_path)
+
+        lines = output_path.read_text(encoding="utf-8").strip().split("\n")
+        assert len(lines) == 2
+        assert json.loads(lines[0])["message_id"] == "msg_001"
+        assert json.loads(lines[1])["message_id"] == "msg_002"

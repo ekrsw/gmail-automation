@@ -1,6 +1,6 @@
 """メール処理パイプラインモジュール
 
-メールの取得・フィルタリング・PDF変換を行うパイプラインを提供する。
+メールの取得・フィルタリング・JSONL保存を行うパイプラインを提供する。
 処理済みメッセージの重複排除機能を含む。
 """
 
@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from gmail_automation.config import AppConfig
-from gmail_automation.converter import convert_to_pdf, generate_filename
+from gmail_automation.converter import append_to_jsonl, build_mail_record
 from gmail_automation.gmail_client import GmailClient
 
 logger = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ class ProcessedIdStore:
 class MailProcessor:
     """メール処理パイプライン
 
-    メールの取得・フィルタリング・PDF変換・保存を一括で行う。
+    メールの取得・フィルタリング・JSONL保存を一括で行う。
     """
 
     def __init__(self, config: AppConfig, gmail_client: GmailClient) -> None:
@@ -106,21 +106,22 @@ class MailProcessor:
         self._id_store.clear()
 
     def process_messages(self, messages: list[dict]) -> list[Path]:
-        """メッセージリストを処理してPDFに変換する。
+        """メッセージリストを処理してJSONLに保存する。
 
-        差出人フィルタ・重複チェックを行い、本文をPDFに変換して保存する。
+        差出人フィルタ・重複チェックを行い、メールデータをJSONLに追記する。
 
         Args:
             messages: 処理対象のメッセージ辞書のリスト。
 
         Returns:
-            生成されたPDFファイルパスのリスト。
+            保存先のJSONLファイルパスのリスト（保存した場合は1要素）。
         """
         output_dir = Path(self._config.output.directory)
         output_dir.mkdir(parents=True, exist_ok=True)
+        jsonl_path = output_dir / "emails.jsonl"
 
         target_senders = {s.lower() for s in self._config.gmail.target_senders}
-        generated_pdfs: list[Path] = []
+        results: list[Path] = []
 
         for message in messages:
             message_id = message.get("id", "")
@@ -147,30 +148,27 @@ class MailProcessor:
                 logger.warning("本文が空です: メッセージID=%s", message_id)
                 continue
 
-            # ファイル名生成
+            # メタデータ取得
             date_str = self._gmail_client.extract_date(message)
             subject = self._gmail_client.extract_subject(message)
-            filename = generate_filename(
-                date_str=date_str,
+
+            # JSONLレコード構築・追記
+            record = build_mail_record(
+                message=message,
                 sender=sender_email,
                 subject=subject,
-                template=self._config.output.filename_template,
+                date_str=date_str,
+                html_body=html_body or None,
+                text_body=text_body or None,
             )
-            pdf_path = output_dir / f"{filename}.pdf"
-
-            # PDF変換・保存
-            convert_to_pdf(
-                html_content=html_body or None,
-                text_content=text_body or None,
-                output_path=pdf_path,
-            )
+            append_to_jsonl(record, jsonl_path)
 
             # 処理済みマーク
             self._id_store.mark_processed(message_id)
-            generated_pdfs.append(pdf_path)
-            logger.info("PDF生成完了: %s", pdf_path)
+            results.append(jsonl_path)
+            logger.info("JSONL保存完了: メッセージID=%s", message_id)
 
-        return generated_pdfs
+        return results
 
     def fetch_and_process(
         self,
@@ -189,7 +187,7 @@ class MailProcessor:
             before: 取得終了日（YYYY/MM/DD形式）。この日以前のメールを取得。
 
         Returns:
-            生成されたPDFファイルパスのリスト。
+            保存先のJSONLファイルパスのリスト。
         """
         if after or before:
             parts: list[str] = []
@@ -220,7 +218,7 @@ class MailProcessor:
             history_id: Gmail APIのhistoryId。
 
         Returns:
-            生成されたPDFファイルパスのリスト。
+            保存先のJSONLファイルパスのリスト。
         """
         logger.info("履歴ベースの処理開始: historyId=%s", history_id)
 

@@ -68,10 +68,9 @@ class TestMailProcessor:
         return MailProcessor(config=sample_config, gmail_client=mock_gmail_client)
 
     def test_process_messages_filters_sender(
-        self, processor, mock_gmail_client, mocker
+        self, processor, mock_gmail_client
     ):
         """対象外の差出人のメッセージがスキップされることを確認する。"""
-        mocker.patch("gmail_automation.processor.convert_to_pdf")
         mock_gmail_client.extract_sender.return_value = "unknown@example.com"
 
         messages = [{"id": "msg_001"}]
@@ -80,11 +79,9 @@ class TestMailProcessor:
         assert result == []
 
     def test_process_messages_skips_processed(
-        self, processor, mock_gmail_client, mocker
+        self, processor, mock_gmail_client
     ):
         """処理済みメッセージがスキップされることを確認する。"""
-        mocker.patch("gmail_automation.processor.convert_to_pdf")
-
         # 事前にmsg_001を処理済みとしてマーク
         processor._id_store.mark_processed("msg_001")
 
@@ -94,3 +91,21 @@ class TestMailProcessor:
         assert result == []
         # extract_senderは呼ばれないはず（重複チェックが先に実行される）
         mock_gmail_client.extract_sender.assert_not_called()
+
+    def test_process_messages_saves_jsonl(
+        self, processor, mock_gmail_client, sample_config
+    ):
+        """メッセージがJSONLファイルに正しく保存されることを確認する。"""
+        messages = [{"id": "msg_001", "threadId": "thread_001", "labelIds": ["INBOX"]}]
+        result = processor.process_messages(messages)
+
+        assert len(result) == 1
+        jsonl_path = result[0]
+        assert jsonl_path.name == "emails.jsonl"
+        assert jsonl_path.exists()
+
+        line = jsonl_path.read_text(encoding="utf-8").strip()
+        record = json.loads(line)
+        assert record["message_id"] == "msg_001"
+        assert record["sender"] == "target@example.com"
+        assert record["subject"] == "テスト件名"

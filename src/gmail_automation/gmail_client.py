@@ -24,28 +24,41 @@ class GmailClient:
         """
         self._service: Resource = build("gmail", "v1", credentials=credentials)
 
-    def fetch_messages(
-        self, query: str = "", max_results: int = 100
-    ) -> list[dict]:
+    def fetch_messages(self, query: str = "") -> list[dict]:
         """メッセージ一覧を取得し、各メッセージの詳細を返す。
+
+        nextPageTokenを使って全ページを取得する。
 
         Args:
             query: Gmail検索クエリ文字列。
-            max_results: 取得する最大メッセージ数。
 
         Returns:
             メッセージ詳細のリスト。
         """
-        response = (
-            self._service.users()
-            .messages()
-            .list(userId="me", q=query, maxResults=max_results)
-            .execute()
-        )
+        all_messages: list[dict] = []
+        page_token: str | None = None
 
-        messages = response.get("messages", [])
+        while True:
+            params: dict = {"userId": "me", "q": query, "maxResults": 100}
+            if page_token:
+                params["pageToken"] = page_token
+
+            response = (
+                self._service.users()
+                .messages()
+                .list(**params)
+                .execute()
+            )
+
+            messages = response.get("messages", [])
+            all_messages.extend(messages)
+
+            page_token = response.get("nextPageToken")
+            if not page_token:
+                break
+
         return [
-            self.get_message_detail(msg["id"]) for msg in messages
+            self.get_message_detail(msg["id"]) for msg in all_messages
         ]
 
     def get_message_detail(self, message_id: str) -> dict:
@@ -229,17 +242,14 @@ class GmailClient:
             .execute()
         )
 
-    def fetch_messages_by_sender(
-        self, sender: str, max_results: int = 100
-    ) -> list[dict]:
+    def fetch_messages_by_sender(self, sender: str) -> list[dict]:
         """指定した送信者からのメッセージを取得する。
 
         Args:
             sender: 送信者のメールアドレス。
-            max_results: 取得する最大メッセージ数。
 
         Returns:
             メッセージ詳細のリスト。
         """
         query = f"from:{sender}"
-        return self.fetch_messages(query=query, max_results=max_results)
+        return self.fetch_messages(query=query)

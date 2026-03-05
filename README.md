@@ -113,12 +113,25 @@ uv run python -m gmail_automation watch
 
 `Ctrl+C` で停止します。
 
+### メールのパース
+
+取得した Daily Confirmation メールの HTML をパースし、Deals・Positions・A/C Summary を構造化データ（JSONL）として出力します。
+
+```bash
+# デフォルト（output/emails.jsonl → output/parsed_confirmations.jsonl）
+uv run python -m gmail_automation parse
+
+# 入出力ファイルを指定
+uv run python -m gmail_automation parse --input output/emails.jsonl --output output/parsed_confirmations.jsonl
+```
+
 ### コマンド一覧
 
 | コマンド | 説明 |
 |---|---|
 | `auth` | OAuth2 認証を実行 |
 | `fetch` | 手動でメールを取得して PDF 化 |
+| `parse` | Daily Confirmation メールをパースして JSONL 出力 |
 | `watch` | Pub/Sub でリアルタイム監視 |
 | `config-init` | 設定ファイルのテンプレートを生成 |
 
@@ -157,6 +170,7 @@ gmail_automation/
 │   ├── auth.py                # OAuth2 認証
 │   ├── gmail_client.py        # Gmail API クライアント
 │   ├── converter.py           # HTML/テキスト → PDF 変換
+│   ├── parser.py              # Daily Confirmation HTML パーサー
 │   ├── processor.py           # メール処理パイプライン
 │   └── pubsub_listener.py     # Pub/Sub リアルタイム監視
 ├── credentials/               # 認証情報（git 管理外）

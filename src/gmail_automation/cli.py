@@ -14,7 +14,7 @@ from gmail_automation.config import (
     load_config,
 )
 
-app = typer.Typer(help="Gmail メール自動PDF化ツール")
+app = typer.Typer(help="Gmail メール自動取得・JSONL保存ツール")
 
 
 def _setup_logging(level: str, log_file: Path | None = None) -> None:
@@ -64,7 +64,7 @@ def fetch(
         DEFAULT_CONFIG_PATH, "--config", "-c", help="設定ファイルのパス",
     ),
 ) -> None:
-    """メールを取得してPDF化する。
+    """メールを取得してJSONLに保存する。
 
     --after/--beforeで日付範囲を指定するか、--daysで過去N日分を取得する。
     """
@@ -83,10 +83,10 @@ def fetch(
         processor.clear_processed_ids()
         typer.echo("処理済みIDをクリアしました")
 
-    pdfs = processor.fetch_and_process(days=days, after=after, before=before)
-    typer.echo(f"処理完了: {len(pdfs)}件のPDFを生成しました")
-    for pdf_path in pdfs:
-        typer.echo(f"  - {pdf_path}")
+    results = processor.fetch_and_process(days=days, after=after, before=before)
+    typer.echo(f"処理完了: {len(results)}件のメールをJSONLに保存しました")
+    if results:
+        typer.echo(f"  出力先: {results[0]}")
 
 
 @app.command()
@@ -111,6 +111,33 @@ def watch(
 
     typer.echo("リアルタイム監視を開始します（Ctrl+Cで停止）")
     listener.start()
+
+
+@app.command()
+def parse(
+    input_path: Path = typer.Option(
+        Path("output/emails.jsonl"), "--input", "-i", help="入力JSONLファイルのパス",
+    ),
+    output_path: Path = typer.Option(
+        Path("output/parsed_confirmations.jsonl"),
+        "--output",
+        "-o",
+        help="出力JSONLファイルのパス",
+    ),
+    config_path: Path = typer.Option(
+        DEFAULT_CONFIG_PATH, "--config", "-c", help="設定ファイルのパス",
+    ),
+) -> None:
+    """Daily ConfirmationメールのHTMLをパースして構造化データを出力する。"""
+    config = load_config(config_path)
+    _setup_logging(config.logging.level, config.logging.file)
+
+    from gmail_automation.parser import parse_jsonl_file
+
+    count = parse_jsonl_file(input_path, output_path)
+    typer.echo(f"パース完了: {count}件のレコードを出力しました")
+    if count > 0:
+        typer.echo(f"  出力先: {output_path}")
 
 
 @app.command()
