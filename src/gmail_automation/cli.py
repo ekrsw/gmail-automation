@@ -167,6 +167,57 @@ def daily_pnl(
 
 
 @app.command()
+def convert_ttm(
+    input_path: Path = typer.Option(
+        Path("docs/TTM.csv"), "--input", "-i", help="入力CSVファイルのパス",
+    ),
+    output_path: Path = typer.Option(
+        Path("output/ttm.json"), "--output", "-o", help="出力JSONファイルのパス",
+    ),
+    year: int = typer.Option(2025, "--year", "-y", help="対象年"),
+) -> None:
+    """TTM CSVファイルをJSON形式に変換する。"""
+    _setup_logging("INFO")
+
+    from gmail_automation.ttm_converter import convert_ttm_csv
+
+    result_path = convert_ttm_csv(input_path, output_path, year)
+    typer.echo(f"TTM変換完了: {result_path}")
+
+
+@app.command()
+def jpy_pnl(
+    pnl_path: Path = typer.Option(
+        Path("output/daily_pnl.jsonl"),
+        "--pnl-path",
+        "-p",
+        help="日別USD損益JSONLファイルのパス",
+    ),
+    ttm_path: Path = typer.Option(
+        Path("output/ttm.json"),
+        "--ttm-path",
+        "-t",
+        help="TTM JSONファイルのパス",
+    ),
+    output_path: Path = typer.Option(
+        Path("output/daily_pnl_jpy.json"),
+        "--output-path",
+        "-o",
+        help="出力JSONファイルのパス",
+    ),
+) -> None:
+    """日別USD損益をTTMレートで円換算し、日別・月計・年計を出力する。"""
+    _setup_logging("INFO")
+
+    from gmail_automation.jpy_converter import convert_daily_pnl_to_jpy
+
+    count = convert_daily_pnl_to_jpy(pnl_path, ttm_path, output_path)
+    typer.echo(f"円換算完了: {count}件の日別レコードを出力しました")
+    if count > 0:
+        typer.echo(f"  出力先: {output_path}")
+
+
+@app.command()
 def config_init(
     output_path: Path = typer.Option(
         DEFAULT_CONFIG_PATH, "--output", "-o", help="出力先パス",

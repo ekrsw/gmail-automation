@@ -177,6 +177,33 @@ uv run python -m gmail_automation daily-pnl --input-path output/parsed_confirmat
 }
 ```
 
+### TTM レート変換（convert-ttm）
+
+TTM（仲値）の CSV ファイルを JSON 形式に変換します。日別レートと月次サマリー（平均・最高・最低）を出力します。
+
+```bash
+# デフォルト（docs/TTM.csv → output/ttm.json）
+uv run python -m gmail_automation convert-ttm
+
+# 入出力ファイル・年を指定
+uv run python -m gmail_automation convert-ttm --input docs/TTM.csv --output output/ttm.json --year 2025
+```
+
+#### 出力例
+
+```json
+{
+  "year": 2025,
+  "rates": {
+    "2025-01-01": 158.18,
+    "2025-01-02": 158.18
+  },
+  "monthly_summary": {
+    "1": {"average": 156.86, "high": 158.43, "low": 154.43}
+  }
+}
+```
+
 ### コマンド一覧
 
 | コマンド | 説明 |
@@ -185,6 +212,7 @@ uv run python -m gmail_automation daily-pnl --input-path output/parsed_confirmat
 | `fetch` | メールを取得して JSONL に保存 |
 | `parse` | Daily Confirmation メールをパースして JSONL 出力 |
 | `daily-pnl` | アカウント別・日別 USD 損益を5要素分解して JSONL 出力 |
+| `convert-ttm` | TTM CSV を JSON 形式に変換 |
 | `watch` | Pub/Sub でリアルタイム監視・JSONL 保存 |
 | `config-init` | 設定ファイルのテンプレートを生成 |
 
@@ -199,6 +227,7 @@ uv run python -m gmail_automation daily-pnl --input-path output/parsed_confirmat
 | `emails.jsonl` | `fetch` / `watch` | 取得したメールの生データ（HTML本文含む） |
 | `parsed_confirmations.jsonl` | `parse` | パース済み構造化データ（Deals・Positions・A/C Summary） |
 | `daily_pnl.jsonl` | `daily-pnl` | アカウント別・日別 USD 損益（5要素分解） |
+| `ttm.json` | `convert-ttm` | TTM 日別レート・月次サマリー |
 
 ## テスト
 
@@ -225,6 +254,7 @@ gmail-automation/
 │   ├── converter.py           # メールデータ → JSONL レコード変換
 │   ├── parser.py              # Daily Confirmation HTML パーサー
 │   ├── daily_pnl.py           # アカウント別・日別 USD 損益算出（5要素分解）
+│   ├── ttm_converter.py       # TTM CSV→JSON 変換
 │   ├── processor.py           # メール取得・保存パイプライン
 │   └── pubsub_listener.py     # Pub/Sub リアルタイム監視
 ├── credentials/               # 認証情報（git 管理外）
